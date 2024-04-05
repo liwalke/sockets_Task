@@ -11,7 +11,7 @@ const db = await open({
     filename: 'chat.db',
     driver: sqlite3.Database
 });
-  
+
 // create our 'messages' table (you can ignore the 'client_offset' column for now)
 await db.exec(`
     CREATE TABLE IF NOT EXISTS messages (
@@ -46,34 +46,29 @@ io.on('connection', async (socket) => {
 
     socket.on('message', async message => {
         message = `User ${user} said: ${message}`
-        //console.log(message);
-        //io.emit('message', message)
         
         let result;
         try {
-            // store the message in the database
             result = await db.run('INSERT INTO messages (content) VALUES (?)', message);
         } catch (e) {
             io.emit('message', `Something went wrong! Messages from ${user} may was not delivered.`);
             return;
         }
-        // include the offset with the message
         io.emit('message', message, result.lastID);
     });
 
     if (!socket.recovered) {
-        // if the connection state recovery was not successful
         try {
-          await db.each('SELECT id, content FROM messages WHERE id > ?',
-            [socket.handshake.auth.serverOffset || 0],
-            (_err, row) => {
-              socket.emit('message', row.content, row.id);
-            }
-          )
+            await db.each('SELECT id, content FROM messages WHERE id > ?',
+                [socket.handshake.auth.serverOffset || 0],
+                (_err, row) => {
+                    socket.emit('message', row.content, row.id);
+                }
+            )
         } catch (e) {
             io.emit('message', `Something went wrong! Messages from ${user} may was not delivered.`);
         }
-      }
+    }
 });
 
 server.listen(3000, () => {
